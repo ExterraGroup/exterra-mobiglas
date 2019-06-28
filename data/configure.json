@@ -1,0 +1,25 @@
+{
+  "configure_dict": {
+    "welcome": {
+      "enabled": true,
+      "welcome_channel": 521561635588931587,
+      "welcome_msg": ""
+    },
+    "raid": {
+      "enabled": true,
+      "report_channels": [
+        525684649268346893
+      ],
+      "permissions": "Member"
+    },
+    "settings": {
+      "offset": 0,
+      "done": false,
+      "prefix": null,
+      "config_sessions": {}
+    }
+  },
+  "raidchannel_dict": {},
+  "motionchannel_dict": {},
+  "citizen": {}
+}

@@ -1,0 +1,26 @@
+{
+  "operation": {
+    "comms": {
+      "teamspeak": {
+        "name": "TeamSpeak",
+        "details": "tbd, connect here, blah blah blah"
+      },
+      "discord": {
+        "name": "Discord",
+        "details": "casual"
+      }
+    }
+  },
+  "operation_defaults": {
+    "name": "Operation Redacted",
+    "min_commanders": 1,
+    "max_commanders": 1,
+    "min_players": 2,
+    "max_players": 50,
+    "comms": "TeamSpeak",
+    "details": "redacted",
+    "link": "redacted",
+    "date": "yyyy-mm-ddT00:00",
+    "commander_assignment": "fifo"
+  }
+}

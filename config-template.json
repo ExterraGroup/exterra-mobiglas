@@ -1,0 +1,38 @@
+{
+  "bot": {
+    "name": "The Mobiglas",
+    "token": "INSERT_DISCORD_BOT_TOKEN",
+    "playing": "with Humans",
+    "owners": [
+      DISCORD_USER_ID_1,
+      DISCORD_USER_ID_2
+    ],
+    "join_message": "Reporting for duty 🌟",
+    "prefix": [
+      "!"
+    ],
+    "admin_channels": [
+      DISCORD_ADMIN_CHANNEL_ID
+    ],
+    "reserved": {
+      "roles": [
+        "@everyone",
+        "Board Member"
+      ]
+    }
+  },
+  "org": {
+    "name": "EXTERRA"
+  },
+  "sentry": {
+    "enabled": false,
+    "sentry_url": "SENTRY_URL"
+  },
+  "graphql": {
+    "url": "https://YOUR_DOMAIN/graphql",
+    "secret": "SECRET_KEY"
+  },
+  "logging": {
+    "path": "logs/mobiglas.log"
+  }
+}

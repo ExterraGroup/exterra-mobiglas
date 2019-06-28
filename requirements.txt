@@ -1,0 +1,11 @@
+git+https://github.com/Rapptz/discord.py@a136def52f72a0b100711b4b47950f57179bfa2d
+psutil
+asyncio
+timeago
+yarl<1.2
+pytz
+pyrsi
+bs4
+sentry-sdk
+gql
+envparse==0.2.0
