@@ -42,6 +42,7 @@
       "enabled": true,
       "channel": DISCORD_WELCOME_CHANNEL_ID,
       "msg": "f\"[Welcome to the {settings.org.name} {member.mention}. If you're here to join the cause, please apply through the proper channels ([{settings.org.sid}]({settings.org.url})) today!]\""
-    }
+    },
+    "motion": {}
   }
 }
