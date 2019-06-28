@@ -1,6 +1,6 @@
 {
   "bot": {
-    "name": "The Mobiglas",
+    "name": "mG.bot",
     "token": "INSERT_DISCORD_BOT_TOKEN",
     "playing": "with Humans",
     "owners": [
@@ -22,17 +22,26 @@
     }
   },
   "org": {
-    "name": "EXTERRA"
+    "sid": "EXTERRA",
+    "name": "Exterra Group",
+    "url": "https://robertsspaceindustries.com/orgs/EXTERRA/"
   },
-  "sentry": {
+  "sentry_dsn": {
     "enabled": false,
-    "sentry_url": "SENTRY_URL"
+    "url": "SENTRY_URL"
   },
-  "graphql": {
+  "scorgsite": {
     "url": "https://YOUR_DOMAIN/graphql",
     "secret": "SECRET_KEY"
   },
   "logging": {
     "path": "logs/mobiglas.log"
+  },
+  "data": {
+    "welcome": {
+      "enabled": true,
+      "channel": DISCORD_WELCOME_CHANNEL_ID,
+      "msg": "f\"[Welcome to the {settings.org.name} {member.mention}. If you're here to join the cause, please apply through the proper channels ([{settings.org.sid}]({settings.org.url})) today!]\""
+    }
   }
 }
