@@ -48,6 +48,9 @@ settings = _Settings({
         "url": env.url("SCORGSITE_URL", default=""),
         "secret": env.str("SCORGSITE_SECRET", default=""),
     },
+    "rocksdb": {
+        "path": env.str("ROCKSDB_PATH", default="/opt/rocksdb/mobiglas.db")
+    },
     "logs": {
         "path": env.str("LOG_PATH", default="logs/mobiglas.log")
     },

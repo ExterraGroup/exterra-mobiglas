@@ -3,7 +3,7 @@ import textwrap
 import discord
 from discord.ext import commands
 
-from mobiglas import settings
+# from mobiglas.rocks.datastore import DataStore
 from mobiglas.utils import make_embed, bold
 
 
@@ -11,9 +11,8 @@ class Context(commands.Context):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.get = GetTools(self)
-        if self.guild:
-            guild_data = self.bot.guild_dict[self.guild.id]
-            self.data = settings.GuildData(self, guild_data)
+        # if self.guild:
+        #     datastore = DataStore()
 
     async def codeblock(self, contents, syntax="py", send=True, title=None):
         paginator = commands.Paginator(prefix=f'```{syntax}', max_size=1900)

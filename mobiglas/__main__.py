@@ -7,10 +7,13 @@ from discord.ext import commands
 from mobiglas.bot import MobiGlasBot
 from mobiglas.config import settings
 from mobiglas.logs import init_loggers
+from mobiglas.rocks.datastore import DataStore
 
 configure_dict = settings.data
-
 logger = init_loggers(settings.logs.path)
+
+# persistence
+datastore = DataStore(settings.rocksdb.path)
 
 print("Loading...")
 help_attrs = dict(hidden=True)
@@ -18,11 +21,9 @@ MobiGlas = MobiGlasBot(command_prefix=settings.bot.prefix,
                        case_insensitive=True,
                        prefix=settings.bot.prefix,
                        pm_help=True,
-                       help_attrs=help_attrs
-                       # formatter=HelpFormat()
-                       )
+                       help_attrs=help_attrs)
 
-modules = ['events', 'fun', 'motion', 'raid', 'rsi', 'rsiadmin']
+modules = ['events', 'fun', 'motion', 'raid', 'rsi', 'rsiadmin', 'background']
 
 for mod in modules:
     try:
@@ -36,14 +37,6 @@ for mod in modules:
 if settings.sentry_dsn.enabled:
     sentry_sdk.init(settings.sentry_dsn.url)
 
-# no persistence
-guild_dict = MobiGlas.guild_dict = {
-
-}
-
-
-# BEGIN CORE STUFF ## todo: move to __main__.py
-
 
 @MobiGlas.event
 async def on_ready():
@@ -53,11 +46,12 @@ async def on_ready():
     member_count = 0
     for guild in MobiGlas.guilds:
         member_count += guild.member_count
+        guild_id_bytes = str(guild.id).encode()
         try:
-            if guild.id not in guild_dict:
-                guild_dict[guild.id] = configure_dict
+            if not datastore.exists(guild_id_bytes):
+                datastore.put(guild_id_bytes)
         except KeyError:
-            guild_dict[guild.id] = configure_dict
+            datastore.put(guild_id_bytes)
     await _print(MobiGlas.owner, f"MobiGlas > {server_count} servers connected.\n{member_count} members found.")
     # todo: await maint_start()
 

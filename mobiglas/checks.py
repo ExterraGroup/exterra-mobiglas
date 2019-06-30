@@ -3,6 +3,10 @@ from discord.ext import commands
 
 from .config import settings
 
+from mobiglas.rocks.datastore import DataStore
+
+ds = DataStore()
+
 
 def check_is_owner(ctx):
     author = ctx.author.id
@@ -51,31 +55,36 @@ def check_activemotionchannel(ctx):
         return False
     channel = ctx.channel
     guild = ctx.guild
-    return ctx.bot.guild_dict[guild.id].get('motion', {}).get(channel.id, {}).get('active', False)
+
+    return ds.get(f"{guild.id}.motion.{channel.id}.active", "bool")
 
 
 # Decorators
 def is_owner():
     def predicate(ctx):
         return check_is_owner(ctx)
+
     return commands.check(predicate)
 
 
 def adminchannel():
     def predicate(ctx):
         return check_adminchannel(ctx)
+
     return commands.check(predicate)
 
 
 def raidchannel():
     def predicate(ctx):
         return check_raidchannel(ctx)
+
     return commands.check(predicate)
 
 
 def activemotionchannel():
     def predicate(ctx):
         return check_activemotionchannel(ctx)
+
     return commands.check(predicate)
 
 
