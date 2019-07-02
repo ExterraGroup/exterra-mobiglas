@@ -49,10 +49,10 @@ settings = _Settings({
         "secret": env.str("SCORGSITE_SECRET", default=""),
     },
     "rocksdb": {
-        "path": env.str("ROCKSDB_PATH", default="/opt/rocksdb/mobiglas.db")
+        "path": env.str("ROCKSDB_PATH", default="/opt/mobiglas/rocksdb/mobiglas.db")
     },
     "logs": {
-        "path": env.str("LOG_PATH", default="logs/mobiglas.log")
+        "path": env.str("LOG_PATH", default="/opt/mobiglas/logs/mobiglas.log")
     },
     "data": {
         "welcome": {

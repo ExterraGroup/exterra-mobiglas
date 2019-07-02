@@ -191,8 +191,7 @@ class MotionCommands(commands.Cog):
                     await channel.edit(name=in_motion_channel_name, topic=in_motion_channel_name)
                     role_board_member = discord.utils.get(ctx.guild.roles, name="Board Member")
                     await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
-                                                          content=f"{role_board_member.mention}. A motion has been"
-                                                          " brought to the floor. Please review the motion and mark"
+                                                          content=f"{role_board_member.mention}. A motion has been  brought to the floor. Please review the motion and mark"
                                                           f" your vote. Motion will automatically close at {to_date_time(scheduled_end_time)}"))  # add motion_end_time
                     board_members = role_board_member.members
                     await _vote(ctx, preview, user_list=board_members)
@@ -211,8 +210,7 @@ class MotionCommands(commands.Cog):
                         default_motion_channel_name = channel.name.replace('in-', '')
                         await channel.edit(name=default_motion_channel_name, topic=default_motion_channel_name)
                         await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.red(),
-                                                              content=f"{role_board_member.mention}, {table_vote[0]}"
-                                                              " has tabled the motion. \nMotion is put on pause."))
+                                                              content=f"{role_board_member.mention}, {table_vote[0]} has tabled the motion. \nMotion is put on pause."))
                         return
                     else:
                         # motion_dict['complete']['yea'] = yea_vote
@@ -239,8 +237,7 @@ class MotionCommands(commands.Cog):
                             await channel.edit(name=failed_motion_channel_name, topic=failed_motion_channel_name)
                         else:
                             tally = utils.make_embed(msg_colour=discord.Colour.red(),
-                                                     content=f"{role_board_member.mention}, 24 hours have passed since "
-                                                     f"motion came to floor.\n Motion has failed to pass a majority vote.")
+                                                     content=f"{role_board_member.mention}, 24 hours have passed since motion came to floor.\n Motion has failed to pass a majority vote.")
                             failed_motion_channel_name = channel.name.replace('in-', 'failed-')
                             await channel.edit(name=failed_motion_channel_name, topic=failed_motion_channel_name)
 
@@ -249,8 +246,7 @@ class MotionCommands(commands.Cog):
                         await final_notice.pin()
 
                         # await ctx.send(f"{motion_dict['author'].mention}, the motion has ended. Please document, "
-                        await ctx.send(f"{ds.get(author_mention_id_key)}, the motion has ended. Please document, "
-                                       "then `!motion close` this channel.")
+                        await ctx.send(f"{ds.get(author_mention_id_key)}, the motion has ended. Please document,  then `!motion close` this channel.")
 
                         complete_motion_request = rocksdb.WriteBatch()
                         complete_motion_request.put(base_key + ACTIVE, False)
@@ -283,6 +279,9 @@ class MotionCommands(commands.Cog):
             _clean(ds, ctx, base_key, force=True)
             await asyncio.sleep(20)
             await channel.delete()
+        else:
+            await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.red(),
+                                                  content="Request canceled."))
 
 
 def _name_check(name: str):
