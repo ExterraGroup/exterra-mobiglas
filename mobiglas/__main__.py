@@ -19,7 +19,7 @@ MobiGlas = MobiGlasBot(command_prefix=settings.bot.prefix,
                        pm_help=True,
                        help_attrs=help_attrs)
 
-modules = ['events', 'fun', 'motion', 'raid', 'rsi', 'rsiadmin', 'background']
+modules = ['events', 'fun', 'motion', 'raid', 'rsi', 'rsiadmin', 'system']
 
 for mod in modules:
     try:

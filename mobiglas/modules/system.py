@@ -1,25 +1,51 @@
-import re
+import asyncio
 
 import discord
-import rocksdb
 from discord.ext import commands
 
-from mobiglas import checks
-from mobiglas.rocks.datastore import DataStore
-from mobiglas.rocks.filters import PrefixFilter
+from mobiglas import checks, utils, emoji
 
 
 class System(commands.Cog):
     def __init__(self, bot):
-        ds = DataStore()
         self.bot = bot
-        self.ds = ds
 
     @commands.command()
     @checks.adminchannel()
-    async def clean_all(self, ctx):
+    async def prune(self, ctx, user_input):
+        """
+            prune is used to delete channels without a category that contains {user_input}
+        :param ctx:
+        :param user_input:
+        """
         guild = ctx.guild
-        _clean(self.ds, ctx, str(guild.id))
+        channels = guild.channels
+
+        purge_list = []
+        purge_list_with_names = []
+        for channel in channels:
+            if user_input in channel.name and not channel.category_id:
+                purge_list.append(channel)
+                purge_list_with_names.append(channel.name)
+
+        confirm = await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.orange(),
+                                                        content="*Are you sure you want to purge the following channels?*\n" +
+                                                                "\n".join(purge_list_with_names)))
+
+        reaction, __ = await utils.ask(self.bot, confirm)
+
+        if reaction.emoji == emoji.yes:
+            for channel in purge_list:
+                await ctx.send(f"   > Deleting channel [{channel.name}].")
+                await channel.delete()
+                await asyncio.sleep(0.25)
+            await ctx.send(f"   > Complete.")
+        else:
+            await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.red(),
+                                                  content="Request canceled."))
+
+    # todo: sync command
+    ## this should delete all stale motion channels
 
     @commands.command()
     @checks.adminchannel()
@@ -28,47 +54,6 @@ class System(commands.Cog):
 
         for i in lst:
             print(i)
-
-
-def _clean(ds: DataStore, ctx, prefix: str, force: bool = False):
-    lst = PrefixFilter.find(prefix, ds.scan())
-
-    channel_key_set = _get_channel_key_set(lst)
-
-    cleanup_request = rocksdb.WriteBatch()
-    for cid in channel_key_set:
-        channel = discord.utils.get(ctx.guild.channels, id=cid)
-        if channel is not None and not force:
-            continue
-
-        # delete ds entry if the guild.channel no longer exists
-        channel_id = str(cid)
-        for i in lst:
-            if channel_id in i:
-                print(f"Deleting inactive entry {i}.")
-                cleanup_request.delete(ds.prepare_key(i))
-
-    ds.batch(cleanup_request)
-
-
-def _get_channel_key_set(lst):
-    channel_key_set = set()
-    for key in lst:
-        cid_str = _get_channel_id(key)
-        if cid_str is None:
-            continue
-        key = int(cid_str)
-        channel_key_set.add(key)
-    return channel_key_set
-
-
-def _get_channel_id(src: str):
-    channel_id_regex = re.compile(r'(\d*)(\.)(\w*)(\.)(\d*)')
-    match = channel_id_regex.match(src)
-    if match is None:
-        pass
-    else:
-        return match.group(5)
 
 
 def setup(bot):
