@@ -7,13 +7,9 @@ from discord.ext import commands
 from mobiglas.bot import MobiGlasBot
 from mobiglas.config import settings
 from mobiglas.logs import init_loggers
-from mobiglas.rocks.datastore import DataStore
 
 configure_dict = settings.data
 logger = init_loggers(settings.logs.path)
-
-# persistence
-datastore = DataStore(settings.rocksdb.path)
 
 print("Loading...")
 help_attrs = dict(hidden=True)
@@ -46,12 +42,6 @@ async def on_ready():
     member_count = 0
     for guild in MobiGlas.guilds:
         member_count += guild.member_count
-        guild_id_bytes = str(guild.id).encode()
-        try:
-            if not datastore.exists(guild_id_bytes):
-                datastore.put(guild_id_bytes)
-        except KeyError:
-            datastore.put(guild_id_bytes)
     await _print(MobiGlas.owner, f"MobiGlas > {server_count} servers connected.\n{member_count} members found.")
     # todo: await maint_start()
 

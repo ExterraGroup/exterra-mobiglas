@@ -89,6 +89,19 @@ def santinize_roles(role_names):
     return tmp
 
 
+def santinize_users(users):
+    """Removes bot user from a list of user names
+
+    :param users: String[] of user names
+    :return: String[] of user names
+    """
+    from .config import settings
+    bot_name = settings.bot.name
+    users.remove(bot_name)
+
+    return users
+
+
 def wrap_line(line: str, width=29):
     """Wraps a long string into multiple lines with a default width of 29
     :param width: maximum length of 1 row

@@ -34,11 +34,11 @@
     "url": "https://YOUR_DOMAIN/graphql",
     "secret": "SECRET_KEY"
   },
-  "rocksdb": {
-    "path": "/opt/mobiglas/rocksdb/mobiglas.db"
+  "db": {
+    "path": "/build/rocksdbs/mobiglas.db"
   },
   "logs": {
-    "path": "/opt/mobiglas/logs/mobiglas.log"
+    "path": "/build/logs/mobiglas.log"
   },
   "data": {
     "welcome": {

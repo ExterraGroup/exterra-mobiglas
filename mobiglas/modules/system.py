@@ -9,7 +9,7 @@ from mobiglas.rocks.datastore import DataStore
 from mobiglas.rocks.filters import PrefixFilter
 
 
-class Background(commands.Cog):
+class System(commands.Cog):
     def __init__(self, bot):
         ds = DataStore()
         self.bot = bot
@@ -72,4 +72,4 @@ def _get_channel_id(src: str):
 
 
 def setup(bot):
-    bot.add_cog(Background(bot))
+    bot.add_cog(System(bot))

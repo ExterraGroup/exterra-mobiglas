@@ -9,4 +9,4 @@ bs4
 sentry-sdk
 gql
 envparse==0.2.0
-python-rocksdb
+peewee

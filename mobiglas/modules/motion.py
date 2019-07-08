@@ -1,28 +1,12 @@
 import asyncio
+from datetime import datetime, timezone
 
 import discord
-import rocksdb
 from discord.ext import commands
 
 from mobiglas import checks, utils, emoji
-from mobiglas.modules.background import _clean
-from mobiglas.rocks.datastore import DataStore
-# statics
-from mobiglas.time import current_date_time, current_milli_time, add_hours, to_date_time
-
-DETAIL_ID = ".detail_id"
-ACTIVE = ".active"
-AUTHOR_MENTION_ID = ".author_mention_id"
-IN_MOTION = ".in_motion"
-TIMEOUT = ".timeout"
-START_TIME = ".start_time"
-END_TIME = ".end_time"
-COMPLETE_STATUS = ".complete.status"
-COMPLETE_YEA = ".complete.yea"
-COMPLETE_NAY = ".complete.nay"
-CLOSED = ".closed"
-
-ds = DataStore()
+from mobiglas.db import get_1, save_and_get
+from mobiglas.db.model.motion import Motion
 
 
 class MotionCommands(commands.Cog):
@@ -39,230 +23,245 @@ class MotionCommands(commands.Cog):
         ows = dict(ctx.channel.overwrites)
         motion_name = _name_check(utils.sanitize_channel_name(name))
 
-        offer_msg = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
-                                                          content=f"Would you like to begin the motion [**{motion_name}**]?"))
+        offer_msg = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour, content=f"Would you like to begin the motion [**{motion_name}**]?"))
 
         reaction, __ = await utils.ask(self.bot, offer_msg)
 
         if reaction.emoji == emoji.yes:
-            motion_channel = ctx.motion_channel = await guild.create_text_channel(motion_name, overwrites=ows)
+            motion_channel = await guild.create_text_channel(motion_name, overwrites=ows)
             await motion_channel.edit(topic=motion_name)
 
-            await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
-                                                  content=f"Creating motion channel [{ctx.motion_channel.mention}]."))
+            await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour, content=f"Creating motion channel [{motion_channel.mention}]."))
 
-            motion_request = rocksdb.WriteBatch()
+            # create motion
+            eligible_nicks = []
+            for member in ctx.channel.members:
+                eligible_nicks.append(member.display_name)
+            utils.santinize_users(eligible_nicks)  # remove bot name
 
-            base_key = f"{guild.id}.motion.{motion_channel.id}"
-            motion_request.put(*ds.prepare(base_key, None))  # add the base for easy searching
-            motion_request.put(*ds.prepare(base_key + ACTIVE, True))
-            motion_request.put(*ds.prepare(base_key + AUTHOR_MENTION_ID, ctx.author.mention))
-            motion_request.put(*ds.prepare(base_key + DETAIL_ID, None))
-            motion_request.put(*ds.prepare(base_key + IN_MOTION, False))
-            motion_request.put(*ds.prepare(base_key + TIMEOUT, 24))
-            motion_request.put(*ds.prepare(base_key + START_TIME, None))
-            motion_request.put(*ds.prepare(base_key + END_TIME, None))
-            motion_request.put(*ds.prepare(base_key + COMPLETE_STATUS, False))
-            motion_request.put(*ds.prepare(base_key + COMPLETE_YEA, None))
-            motion_request.put(*ds.prepare(base_key + COMPLETE_NAY, None))
-            motion_request.put(*ds.prepare(base_key + CLOSED, False))
-
-            ds.batch(motion_request)
+            Motion(id=motion_channel.id,
+                   name=motion_name,
+                   creator_id=ctx.author.mention,
+                   eligible_members=",".join(eligible_nicks),
+                   eligible_max=len(eligible_nicks)) \
+                .save(force_insert=True)
 
         elif reaction.emoji == emoji.no:
-            await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.red(),
-                                                  content=f"Acknowledged, will not create motion [{motion_name}]."))
+            await ctx.send(embed=_cancel_request())
+            return
+        else:
+            return
 
         # send help
-        help_embed = _get_motion_help(ctx.prefix, ctx.bot.user.avatar_url)
-        await ctx.motion_channel.send(embed=help_embed)
+        help_screen = _get_motion_help(ctx.prefix, ctx.bot.user.avatar_url)
+        await motion_channel.send(embed=help_screen)
 
-    # todo: check to see if it's the creator of the channel
     @motion.command()
     @checks.activemotionchannel()
     async def name(self, ctx, name: str):
         channel = ctx.channel
 
-        name = _name_check(utils.sanitize_channel_name(name))
+        motion = get_1(Motion, Motion.id == channel.id)
+        # at the time of writing, we are locking down the name changes to motions that have NOT_STARTED
+        if motion.status == 'NOT_STARTED':
+            name = _name_check(utils.sanitize_channel_name(name))
 
-        await ctx.send(f"Changing motion name from **{channel.name}** to **{name}**")
-        await channel.edit(name=name, topic=name)
+            await ctx.send(embed=_valid_request(f"Changing motion name from **{channel.name}** to **{name}**"))
+            await channel.edit(name=name, topic=name)
+            motion.name = name
+            motion.save()
+        else:
+            await ctx.send(embed=_warn_msg(f"Cannot change the name of the motion, because motion is {motion.status}."))
 
-    @motion.command()
+    @commands.command()
     @checks.activemotionchannel()
-    async def detail(self, ctx, details=None):
+    async def detail(self, ctx, user_input=None):
         channel = ctx.channel
         guild = ctx.guild
-        base_key = f"{guild.id}.motion.{channel.id}"
-        detail_id_key = base_key + DETAIL_ID
 
-        # the embed msg id
-        detail_id = ds.get(detail_id_key, int)
-        if not details:
-            if _is_null(detail_id):
-                await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.red(),
-                                                      content="No detail found."))
+        motion = get_1(Motion, Motion.id == channel.id)
+        if not motion:
+            await ctx.send(embed=_failure_notification("Failed to retrieve motion"))
+            return
+
+        detail_id = motion.detail_id
+        if not user_input:
+            if not detail_id:
+                await ctx.send(embed=_error_msg("No detail found"))
             else:
                 msg = (await ctx.fetch_message(detail_id)).embeds[0]
-                await ctx.send(embed=utils.make_embed(msg_colour=msg.colour,
-                                                      title=channel.name,
-                                                      content=msg.description))
+                await ctx.send(embed=utils.make_embed(msg_colour=msg.colour, title=channel.name, content=msg.description))
                 return
         else:
-            detail_msg = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
-                                                               title=channel.name,
-                                                               content=details))
+            detail_msg = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour, title=channel.name, content=user_input))
             reaction, __ = await utils.ask(self.bot, detail_msg)
 
             if reaction.emoji == emoji.yes:
                 # delete existing
-                if not _is_null(detail_id):
+                if detail_id:
                     exiting_msg = (await ctx.fetch_message(detail_id))
                     await exiting_msg.unpin()
 
                 await detail_msg.pin()
-                ds.put(detail_id_key, detail_msg.id)
 
-    @motion.command()
+                motion.detail_id = detail_msg.id
+                motion.save()
+
+            elif reaction.emoji == emoji.no:
+                await ctx.send(embed=_cancel_request())
+
+    @commands.command()
     @checks.activemotionchannel()
     async def timeout(self, ctx, hours: int):
+        """
+            Modify the timeout
+        :param ctx: context
+        :param hours: user input [1,24]
+        :return:
+        """
         channel = ctx.channel
-        guild = ctx.guild
-        base_key = f"{guild.id}.motion.{channel.id}"
-        timeout_key = base_key + TIMEOUT
 
         if hours < 1 or hours > 24:
-            await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.red(),
-                                                  content="Valid options are between 1 and 24"))
+            await ctx.send(embed=_warn_msg("Valid options are between 1 and 24"))
         else:
-            await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.green(),
-                                                  content=f"Timer for this motion has been set to {hours} hour(s)."))
-            ds.put(timeout_key, hours)
+            res = Motion.update(timeout=hours).where(Motion.id == channel.id).execute()
+            if res == 1:
+                await ctx.send(embed=_valid_request(f"Timer for this motion has been set to {hours} hour(s)."))
+            else:
+                await ctx.send(embed=_failure_notification("Failed to update timeout"))
 
-    @motion.command()
+    @commands.command()
+    @checks.activemotionchannel()
+    async def untable(self, ctx):
+        channel = ctx.channel
+        motion = get_1(Motion, Motion.id == channel.id)
+
+        if not motion:
+            await ctx.send(embed=_failure_notification("No motion found"))
+        else:
+            if motion.status != 'TABLED':
+                await ctx.send(embed=_warn_msg("This motion has not been tabled."))
+            else:
+                await ctx.send(embed=_valid_request("This motion has been untabled."))
+                await channel.edit(name=motion.name, topic=motion.name)
+                motion.status = 'NOT_STARTED'
+                motion.save()
+
+    @commands.command()
     @checks.activemotionchannel()
     async def vote(self, ctx):
         channel = ctx.channel
         guild = ctx.guild
-        base_key = f"{guild.id}.motion.{channel.id}"
-        detail_id_key = base_key + DETAIL_ID
-        in_motion_key = base_key + IN_MOTION
-        start_time_key = base_key + START_TIME
-        end_time_key = base_key + END_TIME
-        timeout_key = base_key + TIMEOUT
-        complete_yea_key = base_key + COMPLETE_YEA
-        complete_nay_key = base_key + COMPLETE_NAY
-        complete_status_key = base_key + COMPLETE_STATUS
-        author_mention_id_key = base_key + AUTHOR_MENTION_ID
-        # todo: optimize later with batch queries
 
-        detail_id = ds.get(detail_id_key, int)
-        if _is_null(detail_id):
-            await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
-                                                  content="Cannot vote on nothing."))
+        motion = get_1(Motion, Motion.id == channel.id)
+        if not motion:
+            await ctx.send(embed=_failure_notification("Failed to retrieve motion"))
+            return
+
+        detail_id = motion.detail_id
+        if not detail_id:
+            await ctx.send(embed=_error_msg("Cannot vote on nothing"))
         else:
-            motion = (await ctx.fetch_message(detail_id)).embeds[0]
-            preview = await ctx.send(embed=utils.make_embed(msg_colour=motion.colour,
-                                                            title=channel.name,
-                                                            content=motion.description))
-            in_motion = ds.get(in_motion_key, bool)
-            if in_motion:
-                await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.red(),
-                                                      content="Motion is already in progress."))
+            msg = (await ctx.fetch_message(detail_id)).embeds[0]
+            preview = await ctx.send(embed=utils.make_embed(msg_colour=msg.colour, title=channel.name, content=msg.description))
+            motion.motion_id = preview.id
+            motion = save_and_get(motion)
+            status = motion.status  # [NOT_STARTED, IN_PROGRESS, TABLED, COMPLETE, CLOSED]
+
+            if status == 'IN_PROGRESS':
+                await ctx.send(embed=_warn_msg("Motion is already in progress."))
+            elif status in ['COMPLETE', 'CLOSED']:
+                await ctx.send(embed=_warn_msg("Motion has been completed. Please submit a referendum."))
             else:
-                confirm = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
-                                                                content="Are you sure you want to bring this motion to the floor?"))
+                confirm = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour, content="Are you sure you want to bring this motion to the floor?"))
                 reaction, __ = await utils.ask(self.bot, confirm)
 
                 if reaction.emoji == emoji.yes:
                     await confirm.delete()
 
-                    # set timeout
-                    ts = current_milli_time()
-                    ds.put(start_time_key, ts)
-                    timeout = ds.get(timeout_key, int)
-                    scheduled_end_time = add_hours(ts, timeout)
-                    ds.put(end_time_key, scheduled_end_time)
+                    motion.status = 'IN_PROGRESS'
+                    motion = save_and_get(motion)
 
-                    # set in_motion state
-                    ds.put(in_motion_key, True)
+                    # update channel name to reflect a motion in-progress
+                    if not channel.name.startswith("in-"):
+                        new_channel_name = f"in-{motion.name}"
+                        await channel.edit(name=new_channel_name, topic=new_channel_name)
 
-                    in_motion_channel_name = f"in-{channel.name}"
-                    await channel.edit(name=in_motion_channel_name, topic=in_motion_channel_name)
+                    # begin setup
                     role_board_member = discord.utils.get(ctx.guild.roles, name="Board Member")
+
+                    # add motion to table
                     await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
                                                           content=f"{role_board_member.mention}. A motion has been  brought to the floor. Please review the motion and mark"
-                                                          f" your vote. Motion will automatically close at {to_date_time(scheduled_end_time)}"))  # add motion_end_time
-                    board_members = role_board_member.members
-                    await _vote(ctx, preview, user_list=board_members)
+                                                          f" your vote. Motion will automatically close at {motion.end_time}"))
+
+                    # add reactions to motion
+                    for r in [emoji.yes, emoji.no, emoji.table]:
+                        await asyncio.sleep(0.25)
+                        await preview.add_reaction(r)
+
+                    # wait for eligible members to vote
+                    await _vote(ctx, preview, motion)
 
                     # count votes
-                    timer = timeout * 60 * 60  # hours * minutes * seconds
-                    await asyncio.sleep(timer)
-                    cache_msg = await ctx.fetch_message(preview.id)
-                    yea_vote, cyea = _count_votes(await cache_msg.reactions[0].users().flatten())
-                    nay_vote, cnay = _count_votes(await cache_msg.reactions[1].users().flatten())
-                    table_vote, ctable = _count_votes(await cache_msg.reactions[2].users().flatten())
+                    while not _tally_complete(channel.id):
+                        await asyncio.sleep(5)
 
+                    cache_msg = await ctx.fetch_message(preview.id)
+                    yea_vote = _get_voters(await cache_msg.reactions[0].users().flatten())  # unsafe reactions retrieval
+                    nay_vote = _get_voters(await cache_msg.reactions[1].users().flatten())
+
+                    motion = Motion.get_by_id(channel.id)
                     # pause motion if tabled
-                    if ctable > 0:
-                        ds.put(in_motion_key, False)
-                        default_motion_channel_name = channel.name.replace('in-', '')
-                        await channel.edit(name=default_motion_channel_name, topic=default_motion_channel_name)
-                        await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.red(),
-                                                              content=f"{role_board_member.mention}, {table_vote[0]} has tabled the motion. \nMotion is put on pause."))
+                    if motion.tally_tabled_user:
+                        new_channel_name = f"tabled-{motion.name}"
+                        await channel.edit(name=new_channel_name, topic=new_channel_name)
+                        await ctx.send(embed=_warn_msg(f"{role_board_member.mention}, {motion.tally_tabled_user} has tabled the motion. \nMotion is put on pause."))
                         return
                     else:
-                        # motion_dict['complete']['yea'] = yea_vote
-                        # motion_dict['complete']['nay'] = nay_vote
-                        yeas = ', '.join(yea_vote)
-                        nays = ', '.join(nay_vote)
-                        ds.put(complete_yea_key, yeas)
-                        ds.put(complete_nay_key, nays)
+                        yeas = ', '.join(list(set(yea_vote)))  # poor mans dedup
+                        motion.tally_yeas = yeas
+
+                        nays = ', '.join(list(set(nay_vote)))
+                        motion.tally_nays = nays
 
                         tally_members = f"The motion has completed. \n" \
                             f"Those in favor [{yeas}].\n " \
                             f"Those against [{nays}]"
 
-                        # todo: hardcoded to 4 members, calculate based on actual voting members
-                        if cyea + 2 > 2:
-                            tally = utils.make_embed(msg_colour=discord.Colour.green(),
-                                                     content=f"{role_board_member.mention}.\nThe yeas have it.\n{tally_members}")
-                            pass_motion_channel_name = channel.name.replace('in-', 'passed-')
-                            await channel.edit(name=pass_motion_channel_name, topic=pass_motion_channel_name)
-                        elif cnay + 2 > 2:
-                            tally = utils.make_embed(msg_colour=discord.Colour.red(),
-                                                     content=f"{role_board_member.mention}.\nThe nays have it.\n{tally_members}")
-                            failed_motion_channel_name = channel.name.replace('in-', 'failed-')
-                            await channel.edit(name=failed_motion_channel_name, topic=failed_motion_channel_name)
+                        if motion.tally_yea_count > motion.eligible_max / 2:
+                            tally = utils.make_embed(msg_colour=discord.Colour.green(), content=f"{role_board_member.mention}.\nThe **yeas** have it.\n{tally_members}")
+                            new_channel_name = f"passed-{motion.name}"
+                            await channel.edit(name=new_channel_name, topic=new_channel_name)
+                        elif motion.tally_nay_count > motion.eligible_max / 2:
+                            tally = utils.make_embed(msg_colour=discord.Colour.red(), content=f"{role_board_member.mention}.\nThe **nays** have it.\n{tally_members}")
+                            new_channel_name = f"failed-{motion.name}"
+                            await channel.edit(name=new_channel_name, topic=new_channel_name)
                         else:
-                            tally = utils.make_embed(msg_colour=discord.Colour.red(),
-                                                     content=f"{role_board_member.mention}, 24 hours have passed since motion came to floor.\n Motion has failed to pass a majority vote.")
-                            failed_motion_channel_name = channel.name.replace('in-', 'failed-')
-                            await channel.edit(name=failed_motion_channel_name, topic=failed_motion_channel_name)
+                            tally = _error_msg(f"{role_board_member.mention}, {motion.timeout} hours have passed since motion came to floor.\n Motion has **failed** to pass a majority vote.")
+                            new_channel_name = f"failed-{motion.name}"
+                            await channel.edit(name=new_channel_name, topic=new_channel_name)
+                            motion.status = 'COMPLETE'
 
-                        ds.put(complete_status_key, True)
                         final_notice = await ctx.send(embed=tally)
                         await final_notice.pin()
 
-                        # await ctx.send(f"{motion_dict['author'].mention}, the motion has ended. Please document, "
-                        await ctx.send(f"{ds.get(author_mention_id_key)}, the motion has ended. Please document,  then `!motion close` this channel.")
+                        await ctx.send(f"{motion.creator_id}, the motion has ended. Please document,  then `!motion close` this channel.")
 
-                        complete_motion_request = rocksdb.WriteBatch()
-                        complete_motion_request.put(base_key + ACTIVE, False)
-                        complete_motion_request.put(base_key + IN_MOTION, False)
-                        complete_motion_request.put(base_key + END_TIME, current_date_time())
-                        ds.batch(complete_motion_request)
+                        motion.save()
+
+                elif reaction.emoji == emoji.no:
+                    await ctx.send(embed=_cancel_request())
+                else:
+                    return
 
     # todo: resume vote -- after bot outage
 
-    @motion.command()
+    @commands.command()
     @checks.activemotionchannel()
     async def close(self, ctx):
         channel = ctx.channel
         guild = ctx.guild
-        base_key = f"{guild.id}.motion.{channel.id}"
-        closed_key = base_key + CLOSED
 
         confirm = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
                                                         content="Are you sure you want to close this motion? "
@@ -270,18 +269,35 @@ class MotionCommands(commands.Cog):
         reaction, __ = await utils.ask(self.bot, confirm)
 
         if reaction.emoji == emoji.yes:
-            # async service later will consume and send msgs to backend for storage
-            ds.put(closed_key, True)
-            await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.green(),
-                                                  content="Request confirmed. Deleting in 5 minutes."))
-
-            # clear entries
-            _clean(ds, ctx, base_key, force=True)
-            await asyncio.sleep(20)
+            await ctx.send(embed=_valid_request("Request confirmed. Deleting in 5 minutes."))
+            await asyncio.sleep(60 * 5)
             await channel.delete()
+            motion = get_1(Motion, Motion.id == channel.id)
+            motion.status = 'CLOSED'
+            motion.save()
+
         else:
-            await ctx.send(embed=utils.make_embed(msg_colour=discord.Colour.red(),
-                                                  content="Request canceled."))
+            await ctx.send(embed=_cancel_request())
+
+
+def _warn_msg(msg: str):
+    return utils.make_embed(msg_colour=discord.Colour.orange(), content=msg)
+
+
+def _error_msg(msg: str):
+    return utils.make_embed(msg_colour=discord.Colour.red(), content=msg)
+
+
+def _failure_notification(msg: str):
+    return _error_msg(f"Error: {msg}. Please contact a moderator for assistance.")
+
+
+def _cancel_request():
+    return _error_msg("Request canceled.")
+
+
+def _valid_request(msg):
+    return utils.make_embed(msg_colour=discord.Colour.green(), content=msg)
 
 
 def _name_check(name: str):
@@ -292,42 +308,82 @@ def _name_check(name: str):
         return name
 
 
-async def _vote(ctx, message, user_list, timeout=86400, react_list=[emoji.yes, emoji.no, emoji.table]):
-    if isinstance(user_list[0], discord.Member):
-        tmp_list = []
-        for user in user_list:
-            tmp_list.append(user.id)
-        user_list = tmp_list
+def _tally_complete(channel_id):
+    """
+        A motion is considered complete if all votes are accounted for OR
+        the timeout has passed with a majority vote.
+    :param channel_id: Long
+    :return: Boolean
+    """
+    motion = get_1(Motion, channel_id)
+    end_time = motion.end_time.replace(tzinfo=timezone.utc).timestamp()
+    if motion.status == 'COMPLETE':
+        return True
+    if end_time > datetime.now().timestamp():
+        return True
+    return False
+
+
+async def _vote(ctx, message, motion, timeout=86400, react_list=[emoji.yes, emoji.no, emoji.table]):
+    """
+        This function is to watch for reactions and record them as they are received.
+
+        Note:   We were forced to follow this convention, because the Message.reactions() was not updated in real-time.
+                Very likely it is async.
+    :param ctx:
+    :param message: Message
+    :param motion: Motion
+    :param timeout: Long (default=24 hours)
+    :param react_list: List[Emoji's]
+    """
+    member_list = motion.eligible_members.split(",")
 
     def check(reaction, user):
-        return (user.id in user_list) and (reaction.message.id == message.id) and (reaction.emoji in react_list)
+        return (user.nick in member_list) and (reaction.message.id == message.id) and (reaction.emoji in react_list)
 
+    # add reactions to motion
     for r in react_list:
         await asyncio.sleep(0.25)
         await message.add_reaction(r)
 
-    try:  # todo: voting threshold is hardcoded --> make this smarter
-        votes = 3
-        # votes = 0
-        while votes < len(user_list) - 1:
+    try:
+        buffer = Motion.get_by_id(motion.id)
+        while buffer.status != 'COMPLETE':
+            # race condition: if user selects a vote too fast, it won't count
             await asyncio.sleep(0.25)
             reaction, user = await ctx.bot.wait_for('reaction_add', check=check, timeout=timeout)
+            # currently there is no way to wait_for multiple reactions such as 'reaction_add,reaction_remove'
+            # todo: implement own sync callback to handle both cases (post-mvp)
 
-            if reaction == emoji.table:
+            if reaction.emoji == emoji.table:
+                buffer.tally_tabled_user = user.nick  # a bit wonky, todo: normalizer later
+                buffer.save()
                 return
-            votes += 1
+            elif reaction.emoji == emoji.yes:
+                buffer.tally_yea_count = reaction.count - 1
+            elif reaction.emoji == emoji.no:
+                buffer.tally_nay_count = reaction.count - 1
+
+                # save_and_get() appears to be unsafe with this thread... todo: explore
+            buffer.save()
+            buffer = Motion.get_by_id(motion.id)
         return
     except asyncio.TimeoutError:
         pass
 
 
-def _count_votes(votes):
+def _get_voters(users):
+    """
+        Gets the list of voters excluding the bot
+    :param users: List[String] of user names
+    :return: List[String]
+    """
     voters = []
-    for vote in votes:
+    for vote in users:
         if vote.bot:
             continue
         voters.append(utils.get_member_nickname(vote))
-    return voters, len(voters)
+    return voters
 
 
 def _get_motion_help(prefix, avatar):
@@ -341,12 +397,13 @@ def _get_motion_help(prefix, avatar):
     help_embed.add_field(
         name="Motion MGMT Commands",
         value=(
-            f"`{prefix}motion name \"<motion name>\"`\n"
-            f"`{prefix}motion detail \"<details>\"`\n"
-            f"`{prefix}motion timeout \"<1-24> hours\"`\n"
-            f"`{prefix}motion vote`\n"
-            f"`{prefix}motion close`\n"
-            f"`{prefix}motion help`\n"))
+            f"`{prefix}name \"<motion name>\"`\n"
+            f"`{prefix}detail \"<details>\"`\n"
+            f"`{prefix}timeout \"<1-24> hours\"`\n"
+            f"`{prefix}vote`\n"
+            f"`{prefix}untable`\n"
+            f"`{prefix}close`\n"
+            f"`{prefix}help`\n"))
     help_embed.add_field(
         name="Defaults",
         value=(
@@ -355,16 +412,10 @@ def _get_motion_help(prefix, avatar):
             "`24`\n"
             "\n"
             "\n"
+            "\n"
             "\n"))
 
     return help_embed
-
-
-def _is_null(src):
-    if src == "null" or src is None:
-        return True
-    else:
-        return False
 
 
 def setup(bot):

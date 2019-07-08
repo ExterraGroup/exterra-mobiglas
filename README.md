@@ -37,12 +37,11 @@ To clone the files from our repository or your own forked repository on GitHub, 
 
 ##### Docker
 
+Build Docker Volume `docker volume create mobiglas-vol`
 
 Build Docker Container `docker build --tag mobiglas .`
 
-Get Image ID `docker images`
-
-Run mobiglas `docker run -i -d #IMAGE_ID`
+Run mobiglas `docker run -v mobiglas-vol:/build -i -d #IMAGE_ID`
 
 
 #### Credits

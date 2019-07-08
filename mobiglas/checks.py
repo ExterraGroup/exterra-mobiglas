@@ -1,11 +1,9 @@
 import discord.utils
 from discord.ext import commands
 
+from mobiglas.db import get_1
+from mobiglas.db.model.motion import Motion
 from .config import settings
-
-from mobiglas.rocks.datastore import DataStore
-
-ds = DataStore()
 
 
 def check_is_owner(ctx):
@@ -53,10 +51,8 @@ def check_adminchannel(ctx):
 def check_activemotionchannel(ctx):
     if ctx.guild is None:
         return False
-    channel = ctx.channel
-    guild = ctx.guild
 
-    return ds.get(f"{guild.id}.motion.{channel.id}.active", "bool")
+    return False if not get_1(Motion, Motion.id == ctx.channel.id) else True
 
 
 # Decorators
