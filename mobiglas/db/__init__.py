@@ -2,6 +2,7 @@ from peewee import *
 
 from mobiglas.config import settings
 
+
 class SqliteInstance:
     def __init__(self):
         self.database = SqliteDatabase(settings.db.path)
@@ -26,6 +27,11 @@ def get_1(model, query):
     """
     results = model.select().where(query).limit(1)
     return results[0] if len(results) > 0 else None
+
+
+def get_all(model, query, col=SQL('*')):
+    result = model.select(col).where(query)
+    return result if len(result) > 0 else []
 
 
 def save_and_get(model):

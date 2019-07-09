@@ -306,7 +306,7 @@ async def ask(bot, message, user_list=None, timeout=60, *, react_list=[emoji.yes
         await message.add_reaction(r)
     try:
         reaction, user = await bot.wait_for('reaction_add', check=check, timeout=timeout)
-        await message.clear_reactions()
+        # await message.clear_reactions()
         return reaction, user
     except asyncio.TimeoutError:
         await message.clear_reactions()

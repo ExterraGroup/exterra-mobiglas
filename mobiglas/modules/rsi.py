@@ -27,18 +27,17 @@ class RsiCommands(commands.Cog):
             color = discord.Colour(0xC2E3DC)
 
             if matches == 0:
-                invalid_msg = utils.make_embed(msg_colour=color, content="No matches found.")
-                await ctx.send(embed=invalid_msg)
+                await ctx.warning("No matches found.")
                 return
 
             if matches > 10:
-                bad_query_msg = utils.make_embed(msg_colour=color,
-                                                 content=f"**Keyword:** {keyword} returned {matches} results. Be more specific.")
-                await ctx.send(embed=bad_query_msg)
+                # bad_query_msg = utils.make_embed(msg_colour=color,
+                #                                  content=f"**Keyword:** {keyword} returned {matches} results. Be more specific.")
+                await ctx.warning(f"**Keyword** [{keyword}] returned {matches} results. Be more specific.")
                 return
 
             if matches == 1:
-                await ctx.send(embed=self.craft_ship_info(color=color, ship=ship[0]))
+                await ctx.send(embed=craft_ship_info(color=color, ship=ship[0]))
                 return
 
             if matches > 1:
@@ -51,47 +50,45 @@ class RsiCommands(commands.Cog):
                     model = ship[i]['name']
                     content_builder.append(f"{emoji.numbers_unicode_list[i]:<{20}}: {model}\n")
 
-                selection_msg = utils.make_embed(msg_colour=color,
-                                                 content=''.join(content_builder))
-
-                offer_msg = await ctx.send(embed=selection_msg)
+                offer_msg = await ctx.embed(colour=color, description=''.join(content_builder))
 
                 reaction, __ = await utils.ask(self.bot, offer_msg, react_list=emoji.numbers_unicode_list[:matches])
 
                 pos = emoji.get_index(emoji=reaction.emoji)
-                await ctx.send(embed=self.craft_ship_info(color=color, ship=ship[pos - 1]))
+                await ctx.send(embed=craft_ship_info(color=color, ship=ship[pos - 1]))
                 return
         except:
-            await ctx.send("Try again.")
+            await ctx.warning("Try again.")
 
-    def craft_ship_info(self, color, ship):
-        manufacturer = ship['manufacturer']['name']
-        img = ship['images']['store_large']
-        name = ship['name']
-        ship_url = ship['url']
-        focus = ship['focus']
-        length = ship['length']
-        height = ship['height']
-        beam = ship['beam']
-        min_crew = ship['minCrew']
-        max_crew = ship['maxCrew']
-        cargo_capacity = ship['cargoCapacity']
-        pledge_cost = ship['pledgeCost']
 
-        return utils.make_embed(msg_colour=color,
-                                content=f"[{manufacturer} - {name}]({ship_url})",
-                                fields={
-                                    'Focus': focus,
-                                    'Length': str(length),
-                                    'Height': str(height),
-                                    'Beam': str(beam),
-                                    'Cargo Capacity': str(cargo_capacity),
-                                    'Min Crew': str(min_crew),
-                                    'Max Crew': str(max_crew),
-                                    'Price': str(pledge_cost)
-                                },
-                                inline=True,
-                                image=img)
+def craft_ship_info(color, ship):
+    manufacturer = ship['manufacturer']['name']
+    img = ship['images']['store_large']
+    name = ship['name']
+    ship_url = ship['url']
+    focus = ship['focus']
+    length = ship['length']
+    height = ship['height']
+    beam = ship['beam']
+    min_crew = ship['minCrew']
+    max_crew = ship['maxCrew']
+    cargo_capacity = ship['cargoCapacity']
+    pledge_cost = ship['pledgeCost']
+
+    return utils.make_embed(msg_colour=color,
+                            content=f"[{manufacturer} - {name}]({ship_url})",
+                            fields={
+                                'Focus': focus,
+                                'Length': str(length),
+                                'Height': str(height),
+                                'Beam': str(beam),
+                                'Cargo Capacity': str(cargo_capacity),
+                                'Min Crew': str(min_crew),
+                                'Max Crew': str(max_crew),
+                                'Price': str(pledge_cost)
+                            },
+                            inline=True,
+                            image=img)
 
 
 def setup(bot):

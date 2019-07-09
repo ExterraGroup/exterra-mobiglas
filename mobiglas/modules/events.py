@@ -47,29 +47,29 @@ class Events(commands.Cog):
         elif isinstance(err, errors.CommandNotFound):
             pass
 
-    async def on_guild_join(self, guild):
-        if not settings.join_message:
-            return
-
-        try:
-            to_send = sorted([chan for chan in guild.channels if chan.permissions_for(guild.me).send_messages and isinstance(chan, discord.TextChannel)], key=lambda x: x.position)[0]
-        except IndexError:
-            pass
-        else:
-            await to_send.send(settings.bot.join_message)
+    # async def on_guild_join(self, guild):
+    #     if not settings.join_message:
+    #         return
+    #
+    #     try:
+    #         to_send = sorted([chan for chan in guild.channels if chan.permissions_for(guild.me).send_messages and isinstance(chan, discord.TextChannel)], key=lambda x: x.position)[0]
+    #     except IndexError:
+    #         pass
+    #     else:
+    #         await to_send.send(settings.bot.join_message)
 
     async def on_command(self, ctx):
         try:
             print(f"{ctx.guild.name} > {ctx.author} > {ctx.message.clean_content}")
         except AttributeError:
             print(f"Private message > {ctx.author} > {ctx.message.clean_content}")
-
-    async def on_ready(self):
-        if not hasattr(self.bot, 'uptime'):
-            self.bot.uptime = datetime.utcnow()
-
-        print(f'Ready: {self.bot.user} | Servers: {len(self.bot.guilds)}')
-        await self.bot.change_presence(activity=discord.Game(type=0, name=settings.bot.playing), status=discord.Status.online)
+    #
+    # async def on_ready(self):
+    #     if not hasattr(self.bot, 'uptime'):
+    #         self.bot.uptime = datetime.utcnow()
+    #
+    #     print(f'Ready: {self.bot.user} | Servers: {len(self.bot.guilds)}')
+    #     await self.bot.change_presence(activity=discord.Game(type=0, name=settings.bot.playing), status=discord.Status.online)
 
 
 def setup(bot):

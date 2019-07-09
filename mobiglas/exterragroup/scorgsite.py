@@ -171,3 +171,16 @@ def get_possible_ships(name):
     ''')
 
     return client.execute(query, variable_values={'ship_name': name})['ships']
+
+
+def add_gallery_photo(handle: str, url: str):
+    query = gql('''
+    mutation addGalleryPhoto($handle: String!, $url: String!) {
+      addGalleryPhoto(handle: $handle, url:$url) {
+        success
+        errors
+      }
+    }
+    ''')
+
+    return client.execute(query, variable_values={'handle': handle, 'url': url})['addGalleryPhoto']['success']

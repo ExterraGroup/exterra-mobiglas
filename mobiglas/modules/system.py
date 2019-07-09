@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 
 from mobiglas import checks, utils, emoji
-from mobiglas.db import get_1
+from mobiglas.db import get_1, get_all
 from mobiglas.db.model.motion import Motion
 
 
@@ -14,7 +14,7 @@ class System(commands.Cog):
 
     @commands.command()
     @checks.adminchannel()
-    async def prune(self, ctx, user_input):
+    async def prune(self, ctx, user_input: str):
         """
             prune is used to delete channels without a category that contains {user_input}
         :param ctx:
@@ -23,11 +23,23 @@ class System(commands.Cog):
         guild = ctx.guild
         channels = guild.channels
 
+        # only prune channels that are not active
+        active_channels = []
+        if user_input.strip().lower() == 'motion':
+            for motion in get_all(Motion, Motion.status != 'CLOSED'):
+                active_channels.append(motion.id)
+        else:
+            await ctx.warning("Not a valid option.")
+            return
+
         purge_list = []
         purge_list_with_names = []
         for channel in channels:
-            # only prune channels that are not active
-            if user_input in channel.name and not channel.category_id and not get_1(Motion, Motion.id == channel.id):
+
+            if channel.id in active_channels:
+                continue
+
+            if user_input in channel.name and not channel.category_id:
                 purge_list.append(channel)
                 purge_list_with_names.append(channel.name)
 
@@ -56,10 +68,8 @@ class System(commands.Cog):
     @commands.command()
     @checks.adminchannel()
     async def dump(self, ctx):
-        lst = self.ds.full_scan()
-
-        for i in lst:
-            print(i)
+        # todo
+        return
 
 
 def setup(bot):

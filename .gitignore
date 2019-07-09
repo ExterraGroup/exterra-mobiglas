@@ -2,7 +2,7 @@ config.json
 config-dev.json
 config-prod.json
 logs/*
-mobiglas.db/
+mobiglas.db
 
 # Created by https://www.gitignore.io/api/vim,linux,macos,python,intellij+all
 # Edit at https://www.gitignore.io/?templates=vim,linux,macos,python,intellij+all

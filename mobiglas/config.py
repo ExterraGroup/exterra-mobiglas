@@ -24,7 +24,7 @@ class _Settings(dict):
 
 settings = _Settings({
     "bot": {
-        "name": env.str("BOT_NAME", default="The mobiGlas"),
+        "name": env.str("BOT_NAME", default="mG.bot"),
         "token": env.str("BOT_TOKEN", default=""),
         "playing": env.str("BOT_PLAYING", default="with Humans"),
         "owners": env.list("BOT_OWNER_IDS", default=[]),
@@ -33,6 +33,10 @@ settings = _Settings({
         "admin_channels": env.list("BOT_ADMIN_CHANNEL_IDS", default=[]),
         "reserved": {
             "roles": env.list("BOT_RES_ROLES", default=["@everyone"]),
+        },
+        "gallery": {
+            "enabled": env.bool("BOT_GALLERY_ENABLED", default=False),
+            "name": env.bool("BOT_GALLERY_NAME", default="gallery")
         }
     },
     "org": {

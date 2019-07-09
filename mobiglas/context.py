@@ -32,27 +32,32 @@ class Context(commands.Context):
     async def no(self):
         await self.message.add_reaction('\u274e')
 
-    async def error(self, title, details=None):
+    async def error(self, msg, send=True):
         """Quick send or build an error embed response"""
-        return await self.embed(
-            title=title, description=details, msg_type='error')
+        return await self.embed(colour=discord.Colour.red(), description=msg, send=send)
 
-    async def success(self, title=None, details=None, send=True):
+    async def failed(self, msg):
+        return await self.error(f"Error: {msg}. Please contact a moderator for assistance.")
+
+    async def canceled(self):
+        return await self.error("Request canceled.")
+
+    async def success(self, title=None, msg=None, send=True):
         """Quick send or build an info embed response."""
-        if title:
-            return await self.embed(title, details, msg_type='success', send=send)
+        if msg:
+            return await self.embed(title, description=msg, colour=discord.Colour.green(), send=send)
         else:
             await self.ok()
 
-    async def info(self, title, details=None, send=True):
+    async def info(self, msg, send=True):
         """Quick send or build an info embed response."""
-        return await self.embed(title, details, msg_type='info', send=send)
+        return await self.embed(msg, msg_type='info', send=send)
 
-    async def warning(self, title, details=None, send=True):
+    async def warning(self, msg, send=True):
         """Quick send or build an info embed response."""
-        return await self.embed(title, details, msg_type='warning', send=send)
+        return await self.embed(description=msg, colour=discord.Colour.orange(), send=send)
 
-    async def embed(self, title, description=None, plain_msg='', *,
+    async def embed(self, description, title=None, plain_msg='', *,
                     msg_type=None, title_url=None, colour=None,
                     icon=None, thumbnail='', image='', fields: dict = None,
                     footer=None, footer_icon=None, send=True, inline=False):

@@ -23,7 +23,7 @@ class MotionCommands(commands.Cog):
         ows = dict(ctx.channel.overwrites)
         motion_name = _name_check(utils.sanitize_channel_name(name))
 
-        offer_msg = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour, content=f"Would you like to begin the motion [**{motion_name}**]?"))
+        offer_msg = await ctx.embed(colour=guild.me.colour, description=f"Would you like to begin the motion [**{motion_name}**]?")
 
         reaction, __ = await utils.ask(self.bot, offer_msg)
 
@@ -31,7 +31,7 @@ class MotionCommands(commands.Cog):
             motion_channel = await guild.create_text_channel(motion_name, overwrites=ows)
             await motion_channel.edit(topic=motion_name)
 
-            await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour, content=f"Creating motion channel [{motion_channel.mention}]."))
+            await ctx.embed(colour=guild.me.colour, description=f"Creating motion channel [{motion_channel.mention}].")
 
             # create motion
             eligible_nicks = []
@@ -47,7 +47,7 @@ class MotionCommands(commands.Cog):
                 .save(force_insert=True)
 
         elif reaction.emoji == emoji.no:
-            await ctx.send(embed=_cancel_request())
+            await ctx.canceled()
             return
         else:
             return
@@ -66,12 +66,12 @@ class MotionCommands(commands.Cog):
         if motion.status == 'NOT_STARTED':
             name = _name_check(utils.sanitize_channel_name(name))
 
-            await ctx.send(embed=_valid_request(f"Changing motion name from **{channel.name}** to **{name}**"))
+            await ctx.success(msg=f"Changing motion name from **{channel.name}** to **{name}**")
             await channel.edit(name=name, topic=name)
             motion.name = name
             motion.save()
         else:
-            await ctx.send(embed=_warn_msg(f"Cannot change the name of the motion, because motion is {motion.status}."))
+            await ctx.warning(f"Cannot change the name of the motion, because motion is {motion.status}.")
 
     @commands.command()
     @checks.activemotionchannel()
@@ -81,19 +81,19 @@ class MotionCommands(commands.Cog):
 
         motion = get_1(Motion, Motion.id == channel.id)
         if not motion:
-            await ctx.send(embed=_failure_notification("Failed to retrieve motion"))
+            await ctx.failed("Failed to retrieve motion")
             return
 
         detail_id = motion.detail_id
         if not user_input:
             if not detail_id:
-                await ctx.send(embed=_error_msg("No detail found"))
+                await ctx.error("No detail found")
             else:
                 msg = (await ctx.fetch_message(detail_id)).embeds[0]
-                await ctx.send(embed=utils.make_embed(msg_colour=msg.colour, title=channel.name, content=msg.description))
+                await ctx.embed(colour=msg.colour, title=channel.name, description=msg.description)
                 return
         else:
-            detail_msg = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour, title=channel.name, content=user_input))
+            detail_msg = await ctx.embed(colour=guild.me.colour, title=channel.name, description=user_input)
             reaction, __ = await utils.ask(self.bot, detail_msg)
 
             if reaction.emoji == emoji.yes:
@@ -108,7 +108,7 @@ class MotionCommands(commands.Cog):
                 motion.save()
 
             elif reaction.emoji == emoji.no:
-                await ctx.send(embed=_cancel_request())
+                await ctx.canceled()
 
     @commands.command()
     @checks.activemotionchannel()
@@ -122,13 +122,13 @@ class MotionCommands(commands.Cog):
         channel = ctx.channel
 
         if hours < 1 or hours > 24:
-            await ctx.send(embed=_warn_msg("Valid options are between 1 and 24"))
+            await ctx.warning("Valid options are between 1 and 24")
         else:
             res = Motion.update(timeout=hours).where(Motion.id == channel.id).execute()
             if res == 1:
-                await ctx.send(embed=_valid_request(f"Timer for this motion has been set to {hours} hour(s)."))
+                await ctx.success(msg=f"Timer for this motion has been set to {hours} hour(s).")
             else:
-                await ctx.send(embed=_failure_notification("Failed to update timeout"))
+                await ctx.failed("Failed to update timeout")
 
     @commands.command()
     @checks.activemotionchannel()
@@ -137,12 +137,12 @@ class MotionCommands(commands.Cog):
         motion = get_1(Motion, Motion.id == channel.id)
 
         if not motion:
-            await ctx.send(embed=_failure_notification("No motion found"))
+            await ctx.failed("No motion found")
         else:
             if motion.status != 'TABLED':
-                await ctx.send(embed=_warn_msg("This motion has not been tabled."))
+                await ctx.warning("This motion has not been tabled.")
             else:
-                await ctx.send(embed=_valid_request("This motion has been untabled."))
+                await ctx.success(msg="This motion has been untabled.")
                 await channel.edit(name=motion.name, topic=motion.name)
                 motion.status = 'NOT_STARTED'
                 motion.save()
@@ -155,25 +155,25 @@ class MotionCommands(commands.Cog):
 
         motion = get_1(Motion, Motion.id == channel.id)
         if not motion:
-            await ctx.send(embed=_failure_notification("Failed to retrieve motion"))
+            await ctx.failed("Failed to retrieve motion")
             return
 
         detail_id = motion.detail_id
         if not detail_id:
-            await ctx.send(embed=_error_msg("Cannot vote on nothing"))
+            await ctx.error("Cannot vote on nothing")
         else:
             msg = (await ctx.fetch_message(detail_id)).embeds[0]
-            preview = await ctx.send(embed=utils.make_embed(msg_colour=msg.colour, title=channel.name, content=msg.description))
+            preview = await ctx.embed(colour=msg.colour, title=channel.name, description=msg.description)
             motion.motion_id = preview.id
             motion = save_and_get(motion)
             status = motion.status  # [NOT_STARTED, IN_PROGRESS, TABLED, COMPLETE, CLOSED]
 
             if status == 'IN_PROGRESS':
-                await ctx.send(embed=_warn_msg("Motion is already in progress."))
+                await ctx.warning("Motion is already in progress.")
             elif status in ['COMPLETE', 'CLOSED']:
-                await ctx.send(embed=_warn_msg("Motion has been completed. Please submit a referendum."))
+                await ctx.warning("Motion has been completed. Please submit a referendum.")
             else:
-                confirm = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour, content="Are you sure you want to bring this motion to the floor?"))
+                confirm = await ctx.embed(colour=guild.me.colour, description="Are you sure you want to bring this motion to the floor?")
                 reaction, __ = await utils.ask(self.bot, confirm)
 
                 if reaction.emoji == emoji.yes:
@@ -191,9 +191,9 @@ class MotionCommands(commands.Cog):
                     role_board_member = discord.utils.get(ctx.guild.roles, name="Board Member")
 
                     # add motion to table
-                    await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
-                                                          content=f"{role_board_member.mention}. A motion has been  brought to the floor. Please review the motion and mark"
-                                                          f" your vote. Motion will automatically close at {motion.end_time}"))
+                    await ctx.embed(colour=guild.me.colour,
+                                    description=f"{role_board_member.mention}. A motion has been  brought to the floor. Please review the motion and mark"
+                                    f" your vote. Motion will automatically close at {motion.end_time}")
 
                     # add reactions to motion
                     for r in [emoji.yes, emoji.no, emoji.table]:
@@ -216,7 +216,7 @@ class MotionCommands(commands.Cog):
                     if motion.tally_tabled_user:
                         new_channel_name = f"tabled-{motion.name}"
                         await channel.edit(name=new_channel_name, topic=new_channel_name)
-                        await ctx.send(embed=_warn_msg(f"{role_board_member.mention}, {motion.tally_tabled_user} has tabled the motion. \nMotion is put on pause."))
+                        await ctx.warning(f"{role_board_member.mention}, {motion.tally_tabled_user} has tabled the motion. \nMotion is put on pause.")
                         return
                     else:
                         yeas = ', '.join(list(set(yea_vote)))  # poor mans dedup
@@ -230,15 +230,15 @@ class MotionCommands(commands.Cog):
                             f"Those against [{nays}]"
 
                         if motion.tally_yea_count > motion.eligible_max / 2:
-                            tally = utils.make_embed(msg_colour=discord.Colour.green(), content=f"{role_board_member.mention}.\nThe **yeas** have it.\n{tally_members}")
+                            tally = ctx.embed(colour=discord.Colour.green(), description=f"{role_board_member.mention}.\nThe **yeas** have it.\n{tally_members}", send=False)
                             new_channel_name = f"passed-{motion.name}"
                             await channel.edit(name=new_channel_name, topic=new_channel_name)
                         elif motion.tally_nay_count > motion.eligible_max / 2:
-                            tally = utils.make_embed(msg_colour=discord.Colour.red(), content=f"{role_board_member.mention}.\nThe **nays** have it.\n{tally_members}")
+                            tally = ctx.embed(colour=discord.Colour.red(), description=f"{role_board_member.mention}.\nThe **nays** have it.\n{tally_members}", send=False)
                             new_channel_name = f"failed-{motion.name}"
                             await channel.edit(name=new_channel_name, topic=new_channel_name)
                         else:
-                            tally = _error_msg(f"{role_board_member.mention}, {motion.timeout} hours have passed since motion came to floor.\n Motion has **failed** to pass a majority vote.")
+                            tally = ctx.error(f"{role_board_member.mention}, {motion.timeout} hours have passed since motion came to floor.\n Motion has **failed** to pass a majority vote.", send=False)
                             new_channel_name = f"failed-{motion.name}"
                             await channel.edit(name=new_channel_name, topic=new_channel_name)
                             motion.status = 'COMPLETE'
@@ -251,7 +251,7 @@ class MotionCommands(commands.Cog):
                         motion.save()
 
                 elif reaction.emoji == emoji.no:
-                    await ctx.send(embed=_cancel_request())
+                    await ctx.canceled()
                 else:
                     return
 
@@ -263,13 +263,12 @@ class MotionCommands(commands.Cog):
         channel = ctx.channel
         guild = ctx.guild
 
-        confirm = await ctx.send(embed=utils.make_embed(msg_colour=guild.me.colour,
-                                                        content="Are you sure you want to close this motion? "
-                                                        f"Once closed it cannot be recovered."))
+        confirm = await ctx.embed(colour=guild.me.colour,
+                                  description="Are you sure you want to close this motion? Once closed it cannot be recovered.")
         reaction, __ = await utils.ask(self.bot, confirm)
 
         if reaction.emoji == emoji.yes:
-            await ctx.send(embed=_valid_request("Request confirmed. Deleting in 5 minutes."))
+            await ctx.success(msg="Request confirmed. Deleting in 5 minutes.")
             await asyncio.sleep(60 * 5)
             await channel.delete()
             motion = get_1(Motion, Motion.id == channel.id)
@@ -277,23 +276,7 @@ class MotionCommands(commands.Cog):
             motion.save()
 
         else:
-            await ctx.send(embed=_cancel_request())
-
-
-def _warn_msg(msg: str):
-    return utils.make_embed(msg_colour=discord.Colour.orange(), content=msg)
-
-
-def _error_msg(msg: str):
-    return utils.make_embed(msg_colour=discord.Colour.red(), content=msg)
-
-
-def _failure_notification(msg: str):
-    return _error_msg(f"Error: {msg}. Please contact a moderator for assistance.")
-
-
-def _cancel_request():
-    return _error_msg("Request canceled.")
+            await ctx.canceled()
 
 
 def _valid_request(msg):
