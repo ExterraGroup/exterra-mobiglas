@@ -13,7 +13,9 @@ COPY requirements.txt /
 RUN pip install -r ./requirements.txt --upgrade
 
 COPY . /build
-COPY config-dev.json /build/config.json
+COPY config-prod.json /build/config.json
 WORKDIR /build
+
+RUN mkdir /build/db
 
 CMD ["python", "-m", "mobiglas"]
