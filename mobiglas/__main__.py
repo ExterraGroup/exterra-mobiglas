@@ -28,6 +28,7 @@ for mod in modules:
     try:
         MobiGlas.load_extension(f"mobiglas.modules.{mod}")
     except Exception as e:
+        e.with_traceback()
         print(f'**Error when loading extension {mod}:**\n{type(e).__name__}: {e}')
     else:
         if 'debug' in sys.argv[1:]:
